@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CGPA Calculator Pro</title>
+<style>
+:root{
+--primary:#4f46e5;--secondary:#7c3aed;--accent:#9333ea;
+--success:#16a34a;--danger:#dc2626;--warning:#f59e0b;
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:Segoe UI,sans-serif}
+body{
+min-height:100vh;
+background:linear-gradient(135deg,var(--primary),var(--secondary),var(--accent));
+padding:20px;
+}
+.container{
+max-width:1100px;margin:auto;
+display:grid;gap:20px;
+}
+.card{
+background:#fff;
+border-radius:20px;
+padding:24px;
+box-shadow:0 10px 30px rgba(0,0,0,.12);
+transition:.3s;
+}
+.card:hover{transform:translateY(-2px)}
+h1{text-align:center;color:#fff;font-size:clamp(1.8rem,4vw,3rem)}
+.subtitle{text-align:center;color:#eef;margin-bottom:10px}
+.subject-row{
+display:flex;gap:10px;align-items:center;margin-bottom:12px;
+animation:fade .3s ease;
+}
+.subject-row label{min-width:90px;font-weight:600}
+.subject-row input{
+flex:1;padding:14px;border-radius:14px;border:2px solid #ddd;
+}
+.subject-row input:focus{
+outline:none;box-shadow:0 0 0 4px rgba(99,102,241,.2);
+border-color:var(--primary);
+}
+.delete-subject-btn,.btn{
+border:none;color:#fff;cursor:pointer;border-radius:14px;
+transition:.3s;
+}
+.delete-subject-btn{width:48px;height:48px;background:var(--danger)}
+.btn:hover,.delete-subject-btn:hover{transform:scale(1.04)}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.btn{padding:14px 18px;font-weight:600}
+.add{background:linear-gradient(135deg,#2563eb,#4f46e5)}
+.calc{background:linear-gradient(135deg,#16a34a,#22c55e)}
+.save{background:linear-gradient(135deg,#f59e0b,#fb923c);display:none}
+.result-card{text-align:center}
+.result{font-size:3rem;color:var(--success);font-weight:700}
+table{width:100%;border-collapse:collapse;overflow:hidden}
+th,td{padding:12px;text-align:center}
+thead{background:#1e293b;color:#fff}
+tbody tr:nth-child(even){background:#f8fafc}
+.overall{
+background:linear-gradient(135deg,#16a34a,#22c55e);
+color:#fff;text-align:center;
+}
+.overall-value{font-size:3rem;font-weight:700}
+.edit{background:#4f46e5}.delete{background:#dc2626}.clear{background:#991b1b}
+.subject-removing{opacity:0;transform:translateX(-40px);transition:.35s}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media(max-width:768px){
+.subject-row{flex-direction:column;align-items:stretch}
+.subject-row label{min-width:auto}
+.actions .btn,.delete-subject-btn{width:100%}
+th,td{font-size:.85rem;padding:8px}
+}
+</style>
+</head>
+<body>
+<div class="container">
+<div>
+<h1>CGPA CALC FOR DIPLOMA STUDENTS</h1>
+<p class="subtitle">Responsive Professional Edition</p>
+</div>
+
+<div class="card">
+<div id="subjectsContainer">
+<div class="subject-row">
+<label>Subject 1</label>
+<input type="text" placeholder="O, A+, A, B+, B, C+, RA" oninput="calculateCGPA()">
+<button class="delete-subject-btn" onclick="deleteSubject(this)">❌</button>
+</div>
+</div>
+<div class="actions">
+<button class="btn add" onclick="addSubject()">+ Add Subject</button>
+<button class="btn calc" onclick="calculateCGPA()">Calculate CGPA</button>
+<button class="btn save" id="saveBtn">Save Result</button>
+</div>
+<div id="error" style="color:red;margin-top:10px"></div>
+</div>
+
+<div class="card result-card">
+<h2>Current CGPA</h2>
+<div id="result" class="result">0.00</div>
+</div>
+
+<div class="card">
+<h2>CGPA History</h2><br>
+<button class="btn clear" onclick="clearAllRecords()">Clear All Records</button><br><br>
+<table>
+<thead><tr><th>Name</th><th>CGPA</th><th>Actions</th></tr></thead>
+<tbody id="historyTable"></tbody>
+</table>
+</div>
+
+<div class="card overall">
+<h2>Current Overall CGPA</h2>
+<div id="overallCgpaValue" class="overall-value">0.00</div>
+</div>
+</div>
+
+<script>
+let subjectCount=1,latestCGPA=null;
+let history=JSON.parse(localStorage.getItem('cgpaHistory'))||[];
+
+function addSubject(){
+subjectCount++;
+subjectsContainer.insertAdjacentHTML('beforeend',
+`<div class="subject-row">
+<label>Subject ${subjectCount}</label>
+<input type="text" placeholder="O, A+, A, B+, B, C+, RA" oninput="calculateCGPA()">
+<button class="delete-subject-btn" onclick="deleteSubject(this)">❌</button>
+</div>`);
+}
+
+function renumberSubjects(){
+document.querySelectorAll('.subject-row').forEach((r,i)=>{
+r.querySelector('label').textContent='Subject '+(i+1);
+});
+subjectCount=document.querySelectorAll('.subject-row').length;
+}
+
+function deleteSubject(btn){
+const rows=document.querySelectorAll('.subject-row');
+if(rows.length===1){alert('At least one subject must remain.');return;}
+if(!confirm('Are you sure you want to delete this subject?')) return;
+const row=btn.closest('.subject-row');
+row.classList.add('subject-removing');
+setTimeout(()=>{row.remove();renumberSubjects();calculateCGPA();},350);
+}
+
+function calculateCGPA(){
+const map={"O":10,"A+":9,"A":8,"B+":7,"B":6,"C+":5,"RA":0};
+let total=0,count=0,bad=[];
+document.querySelectorAll('.subject-row input').forEach(i=>{
+let g=i.value.trim().toUpperCase();
+if(!g) return;
+if(map[g]!==undefined){total+=map[g];count++;} else bad.push(g);
+});
+error.textContent='';
+if(bad.length){error.textContent='Invalid grades: '+bad.join(', ');return;}
+if(count===0){result.textContent='0.00';return;}
+latestCGPA=(total/count).toFixed(2);
+result.textContent=latestCGPA;
+saveBtn.style.display='inline-block';
+}
+
+saveBtn.onclick=()=>{
+if(!latestCGPA)return;
+let name=prompt('Enter semester name');
+if(!name)return;
+history.push({name,cgpa:latestCGPA});
+localStorage.setItem('cgpaHistory',JSON.stringify(history));
+renderHistory();
+};
+
+function renderHistory(){
+historyTable.innerHTML='';
+history.forEach((r,i)=>{
+historyTable.innerHTML+=`<tr>
+<td>${r.name}</td><td>${r.cgpa}</td>
+<td>
+<button class="btn edit" onclick="editRecord(${i})">Edit</button>
+<button class="btn delete" onclick="deleteRecord(${i})">Delete</button>
+</td></tr>`;
+});
+updateOverallCGPA();
+}
+
+function editRecord(i){
+let n=prompt('Edit Name',history[i].name);
+if(!n)return;
+history[i].name=n;
+localStorage.setItem('cgpaHistory',JSON.stringify(history));
+renderHistory();
+}
+
+function deleteRecord(i){
+if(confirm('Delete record?')){
+history.splice(i,1);
+localStorage.setItem('cgpaHistory',JSON.stringify(history));
+renderHistory();
+}
+}
+
+function clearAllRecords(){
+if(confirm('Clear all records?')){
+history=[];
+localStorage.removeItem('cgpaHistory');
+renderHistory();
+}
+}
+
+function updateOverallCGPA(){
+if(!history.length){overallCgpaValue.textContent='0.00';return;}
+let total=history.reduce((a,b)=>a+parseFloat(b.cgpa),0);
+overallCgpaValue.textContent=(total/history.length).toFixed(2);
+}
+
+renderHistory();
+</script>
+</body>
+</html>
